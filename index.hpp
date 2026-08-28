@@ -60,6 +60,9 @@ struct Index
 
     void add_document(Id id, Words words)
     {
+        if (documents.contains(id))
+            return;
+
         avg_len = ( documents.size() * avg_len + words.size() )
                 / ( documents.size() + 1 );
 
