@@ -3,9 +3,11 @@
 #include "deps/httplib.h"
 #include "deps/json.hpp"
 
+#include <algorithm>
 #include <cstdlib>
 #include <fstream>
 #include <functional>
+#include <iostream>
 #include <iterator>
 #include <optional>
 #include <stdexcept>
@@ -54,25 +56,14 @@ void index(Search& s, json& j)
     std::cout << id << std::endl;
 }
 
-int main(int argc, char** argv)
+int main(int /*argc*/, char** /*argv*/)
 {
     Search search;
 
-    std::string data_path = getenv_required("DATA_PATH");
     std::string host = getenv_default("HOST", "0.0.0.0");
     int port = getenv_default_int("PORT", 8080);
 
-    auto in = std::ifstream(data_path);
-    std::string line;
-    while (in.good())
-    {
-        std::getline(in, line);
-        if (line.empty())
-            continue;
-
-        auto j = json::parse(line);
-        index(search, j);
-    }
+    std::cerr << "Listening on " << host << ":" << port << std::endl;
 
     httplib::Server server;
     server.Get("/health", [](const httplib::Request& req, httplib::Response& res)
@@ -80,6 +71,21 @@ int main(int argc, char** argv)
         auto q = req.get_param_value("q");
         res.set_content(R"({"status": "ok"})", "application/json");
     });
+
+    server.Post("/index", [&search](const httplib::Request& req, httplib::Response& res)
+    {
+        json j = json::parse(req.body);
+
+        auto id = j.at("_id").get<std::string>();
+        auto txt = j.at("text").get<std::string>();
+
+        // std::cerr << "index " << id << std::endl;
+
+        search.index(std::move(id), std::move(txt));
+
+        res.status = 200;
+    });
+
     server.Get("/search", [&search](const httplib::Request& req, httplib::Response& res)
     {
         auto q = req.get_param_value("q");
@@ -92,7 +98,7 @@ int main(int argc, char** argv)
         // TODO: Error handling.
 
         auto found = search.search(q);
-        if (limit > 0 && found.size() > limit)
+        if (limit > 0 && found.size() > static_cast<unsigned>(limit))
             found.resize(limit);
 
         json results = json::array();
