@@ -36,10 +36,6 @@ struct Document
     Fields data;
 };
 
-// double calc_bm25()
-// {
-// }
-
 struct Index
 {
     using DocumentMap = std::unordered_map<Id, std::uint64_t>;
@@ -82,7 +78,6 @@ struct Index
     Results search(const Words& words)
     {
         Results results;
-        results.reserve(documents.size());
 
         if (documents.empty())
             return results;
@@ -121,52 +116,34 @@ struct Index
         constexpr double k1 = 1.2;
         constexpr double b = 0.75;
 
-        for (const auto& [id, doc] : documents)
+        auto map = std::unordered_map<Id, double>{};
+
+        for (const auto& w : words)
         {
-            auto& res = results.emplace_back();
+            const auto& info = word_maps.at(w);
 
-            res.id = id;
-            double& score = res.score;
+            if (info.counts == nullptr)
+                continue;
 
-            for (const auto& w : words)
+            for (const auto& [id, f_doc] : *info.counts)
             {
-                const auto& info = word_maps.at(w);
+                double& score = map[id];
 
-                double f_doc = 0;
-                if (info.counts != nullptr)
-                {
-                    if (auto it = info.counts->find(id); it != info.counts->end())
-                    {
-                        f_doc = it->second;
-                    }
-                }
+                // TODO: Expensive, I'm sure.
+                double D = documents.at(id).size();
 
-                double D = doc.size();
                 double formula = ( f_doc * ( k1 + 1 ) )
                                 / ( f_doc + k1 * ( 1 - b + b * D / avg_len ) );
                 score += info.idf * formula;
             }
         }
 
+        for (const auto& [id, score] : map)
+            results.push_back(Result{ .id = id, .score = score });
+
         return results;
     }
 };
-
-// struct IndexManager
-// {
-//     std::unordered_map<Id, Document> documents;
-
-//     void add_document(const Document& doc)
-//     {
-//
-//     }
-
-//     std::expected<Results, Error> search(const FieldName& fname,
-//                                          const std::string& query)
-//     {
-//         return std::unexpected("error");
-//     }
-// };
 
 struct Tokenizer
 {
