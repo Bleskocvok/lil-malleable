@@ -59,6 +59,7 @@ void index(Search& s, json& j)
 int main(int /*argc*/, char** /*argv*/)
 {
     SearchManager search;
+    search.load_all();
 
     std::string host = getenv_default("HOST", "0.0.0.0");
     int port = getenv_default_int("PORT", 8080);
@@ -149,10 +150,6 @@ int main(int /*argc*/, char** /*argv*/)
     server.Post("/load", [&search](const httplib::Request& req, httplib::Response& res)
     {
         auto index = req.get_param_value("index");
-
-        if (not search.exists(index))
-            search.create(index);
-
         search.load(index);
     });
 
