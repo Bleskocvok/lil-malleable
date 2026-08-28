@@ -5,8 +5,12 @@
 #include <cstdint>
 #include <expected>
 #include <functional>
+#include <istream>
 #include <map>
+#include <ostream>
+#include <stdexcept>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <ranges>
 #include <utility>
@@ -26,9 +30,9 @@ struct Result
 
 using Results = std::vector<Result>;
 
-using Error = std::string;
-
 using Words = std::vector<std::string>;
+
+using Error = std::runtime_error;
 
 struct Document
 {
@@ -75,7 +79,7 @@ struct Index
         documents.insert_or_assign(std::move(id), std::move(words));
     }
 
-    Results search(const Words& words)
+    Results search(const Words& words) const
     {
         Results results;
 
@@ -84,7 +88,7 @@ struct Index
 
         struct WordInfo
         {
-            DocumentMap* counts = nullptr;
+            const DocumentMap* counts = nullptr;
             double idf = 0;
         };
 
@@ -105,6 +109,7 @@ struct Index
                        ? info.counts->size()
                        : 0;
 
+            // log1p( x ) = log_e( 1 + x )
             info.idf = std::log1p(
                     ( N - n_q + 0.5 )
                     / ( n_q + 0.5 )
@@ -173,7 +178,7 @@ struct Tokenizer
         return map[ static_cast<unsigned char>(c) ];
     }
 
-    Words operator()(std::string txt)
+    Words operator()(std::string txt) const
     {
         auto lowercase = [](unsigned char c) -> char { return std::tolower(c); };
 
@@ -204,7 +209,7 @@ struct Search
         index_.add_document(id, tokenizer(std::move(txt)));
     }
 
-    Results search(std::string q)
+    Results search(std::string q) const
     {
         auto words = tokenizer(std::move(q));
         constexpr double epsilon = 1e-6;
@@ -219,5 +224,72 @@ struct Search
     const Words& get(Id id) const
     {
         return index_.documents.at(id);
+    }
+};
+
+struct Serializer
+{
+    void write(std::ostream& out, const Search& s)
+    {
+        for (const auto& [id, words] : s.index_.documents)
+        {
+            out << id;
+
+            for (const auto& w : words)
+                out << " " << w;
+        }
+    }
+
+    void read(Search& s, std::istream& in)
+    {
+        std::string line;
+
+        while (in.good())
+        {
+            std::getline(in, line);
+
+            if (line.empty())
+                continue;
+
+            auto idx = line.find(',');
+            if (idx == line.npos)
+                throw Error("comma expected");
+
+            Id id = line.substr(0, idx);
+            auto str = line.substr(idx + 1);
+
+            // TODO: Copying navíc. Bylo by fajn mít line jako view a s.index
+            // by ho akceptoval bez koerce.
+            s.index(std::move(id), std::move(str));
+        }
+    }
+};
+
+using SearchName = std::string;
+
+struct SearchManager
+{
+    std::map<SearchName, Search> searches;
+
+    void create(SearchName n)
+    {
+        searches.emplace(std::move(n), Search{});
+    }
+
+    bool remove(const SearchName& n)
+    {
+        return searches.erase(n);
+    }
+
+    bool exists(const SearchName& n) const { return searches.contains(n); }
+
+    const auto& get(const SearchName& n) const { return searches.at(n); }
+          auto& get(const SearchName& n)       { return searches.at(n); }
+
+    std::vector<SearchName> list() const
+    {
+        return searches
+            | std::ranges::views::transform([](const auto& x){ return x.first; })
+            | std::ranges::to<std::vector>();
     }
 };
