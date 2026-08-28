@@ -115,5 +115,12 @@ int main(int /*argc*/, char** /*argv*/)
         res.set_content(resp.dump(), "application/json");
     });
 
+    server.Get("/count", [&search](const httplib::Request& req, httplib::Response& res)
+    {
+        json resp = json::object();
+        resp["count"] = search.index_.documents.size();
+        res.set_content(resp.dump(), "application/json");
+    });
+
     server.listen(host, port);
 }
