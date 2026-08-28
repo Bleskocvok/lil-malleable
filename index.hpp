@@ -17,6 +17,7 @@
 #include <utility>
 #include <iostream>
 #include <vector>
+#include <filesystem>
 
 using Id = std::string;
 
@@ -41,6 +42,11 @@ struct Document
     Id id;
     Fields data;
 };
+
+inline std::ostream& log()
+{
+    return std::cerr;
+}
 
 struct Index
 {
@@ -261,7 +267,7 @@ struct Serializer
             auto idx = line.find(',');
             if (idx == line.npos)
             {
-                std::cerr << "comma expected" << std::endl;
+                log() << "comma expected" << std::endl;
                 throw Error("comma expected");
             }
 
@@ -312,8 +318,28 @@ struct SearchManager
 
     void load(const SearchName& n)
     {
+        if (not exists(n))
+            create(n);
+
         Serializer ser;
         auto in = std::ifstream("data/" + n);
         ser.read(in, get(n));
+    }
+
+    void load_all()
+    {
+        namespace fs = std::filesystem;
+
+        auto path = fs::path("data");
+
+        for (const auto& entry : fs::directory_iterator(path))
+        {
+            if (not entry.is_regular_file())
+                continue;
+
+            auto index = entry.path().filename().string();
+            log() << "Loaded index: " << index << "\n";
+            load(index);
+        }
     }
 };
