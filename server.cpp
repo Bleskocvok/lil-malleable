@@ -58,7 +58,7 @@ void index(Search& s, json& j)
 
 int main(int /*argc*/, char** /*argv*/)
 {
-    Search search;
+    SearchManager search;
 
     std::string host = getenv_default("HOST", "0.0.0.0");
     int port = getenv_default_int("PORT", 8080);
@@ -74,20 +74,23 @@ int main(int /*argc*/, char** /*argv*/)
 
     server.Post("/index", [&search](const httplib::Request& req, httplib::Response& res)
     {
-        json j = json::parse(req.body);
+        auto index = req.get_param_value("index");
 
+        json j = json::parse(req.body);
         auto id = j.at("_id").get<std::string>();
         auto txt = j.at("text").get<std::string>();
 
-        // std::cerr << "index " << id << std::endl;
+        if (not search.exists(index))
+            search.create(index);
 
-        search.index(std::move(id), std::move(txt));
+        search.get(index).index(std::move(id), std::move(txt));
 
         res.status = 200;
     });
 
     server.Get("/search", [&search](const httplib::Request& req, httplib::Response& res)
     {
+        auto index = req.get_param_value("index");
         auto q = req.get_param_value("q");
         // TODO: Error handling.
 
@@ -97,7 +100,7 @@ int main(int /*argc*/, char** /*argv*/)
         // TODO: Error handling.
         // TODO: Error handling.
 
-        auto found = search.search(q);
+        auto found = search.get(index).search(q);
         if (limit > 0 && found.size() > static_cast<unsigned>(limit))
             found.resize(limit);
 
@@ -117,8 +120,10 @@ int main(int /*argc*/, char** /*argv*/)
 
     server.Get("/count", [&search](const httplib::Request& req, httplib::Response& res)
     {
+        auto index = req.get_param_value("index");
+
         json resp = json::object();
-        resp["count"] = search.index_.documents.size();
+        resp["count"] = search.get(index).index_.documents.size();
         res.set_content(resp.dump(), "application/json");
     });
 
