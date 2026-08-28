@@ -64,5 +64,5 @@ with open(f"datasets/{dataset}/queries.jsonl", "r") as f:
 
 b = datetime.now()
 total = (b - a).total_seconds()
-avg = total / count
-print(f"{total=} s | {avg=} s")
+avg = total / count * 1000
+print(f"{total=:.3} s | {avg=:.3} ms")
