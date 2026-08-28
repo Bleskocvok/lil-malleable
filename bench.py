@@ -9,14 +9,22 @@ from datetime import datetime
 import tqdm
 
 
+dataset = "quora"
+if len(sys.argv) > 1:
+    dataset = sys.argv[1]
+
+print(f"{dataset=}")
+
+
 def feed(id: str, txt: str):
+    global dataset
     data = {
         "_id": id,
         "text": txt
     }
     sdata = json.dumps(data).encode("utf-8")
     req = Request(
-        "http://localhost:8080/index",
+        f"http://localhost:8080/index?index={dataset}",
         data=sdata,
         method="POST",
         headers={"Content-Type": "application/json"}
@@ -28,9 +36,10 @@ def feed(id: str, txt: str):
 
 
 def search(q: str):
+    global dataset
     q = quote(q)
     req = Request(
-        f"http://localhost:8080/search?q={q}",
+        f"http://localhost:8080/search?q={q}&index={dataset}",
         method="GET",
         headers={"Content-Type": "application/json"}
     )
@@ -39,12 +48,6 @@ def search(q: str):
         if r.status != 200:
             raise RuntimeError(f"invalid status {r.status}")
 
-
-dataset = "quora"
-if len(sys.argv) > 1:
-    dataset = sys.argv[1]
-
-print(f"{dataset=}")
 
 with open(f"datasets/{dataset}/corpus.jsonl", "r") as f:
     for line in tqdm.tqdm(f):

@@ -74,6 +74,12 @@ int main(int /*argc*/, char** /*argv*/)
 
     server.Post("/index", [&search](const httplib::Request& req, httplib::Response& res)
     {
+        if (not req.has_param("index"))
+        {
+            res.status = 400;
+            return;
+        }
+
         auto index = req.get_param_value("index");
 
         json j = json::parse(req.body);
@@ -90,6 +96,13 @@ int main(int /*argc*/, char** /*argv*/)
 
     server.Get("/search", [&search](const httplib::Request& req, httplib::Response& res)
     {
+        if (not req.has_param("index")
+         || not req.has_param("q"))
+        {
+            res.status = 400;
+            return;
+        }
+
         auto index = req.get_param_value("index");
         auto q = req.get_param_value("q");
         // TODO: Error handling.
@@ -125,6 +138,18 @@ int main(int /*argc*/, char** /*argv*/)
         json resp = json::object();
         resp["count"] = search.get(index).index_.documents.size();
         res.set_content(resp.dump(), "application/json");
+    });
+
+    server.Post("/save", [&search](const httplib::Request& req, httplib::Response& res)
+    {
+        auto index = req.get_param_value("index");
+        search.save(index);
+    });
+
+    server.Post("/load", [&search](const httplib::Request& req, httplib::Response& res)
+    {
+        auto index = req.get_param_value("index");
+        search.load(index);
     });
 
     server.listen(host, port);

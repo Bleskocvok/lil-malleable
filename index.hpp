@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdint>
 #include <expected>
+#include <fstream>
 #include <functional>
 #include <istream>
 #include <map>
@@ -14,6 +15,7 @@
 #include <unordered_map>
 #include <ranges>
 #include <utility>
+#include <iostream>
 #include <vector>
 
 using Id = std::string;
@@ -233,14 +235,19 @@ struct Serializer
     {
         for (const auto& [id, words] : s.index_.documents)
         {
-            out << id;
+            out << id << ",";
 
+            bool fst = true;
             for (const auto& w : words)
-                out << " " << w;
+            {
+                out << (fst ? "" : " ") << w;
+                fst = false;
+            }
+            out << "\n";
         }
     }
 
-    void read(Search& s, std::istream& in)
+    void read(std::istream& in, Search& s)
     {
         std::string line;
 
@@ -253,7 +260,10 @@ struct Serializer
 
             auto idx = line.find(',');
             if (idx == line.npos)
+            {
+                std::cerr << "comma expected" << std::endl;
                 throw Error("comma expected");
+            }
 
             Id id = line.substr(0, idx);
             auto str = line.substr(idx + 1);
@@ -291,5 +301,19 @@ struct SearchManager
         return searches
             | std::ranges::views::transform([](const auto& x){ return x.first; })
             | std::ranges::to<std::vector>();
+    }
+
+    void save(const SearchName& n)
+    {
+        Serializer ser;
+        auto out = std::ofstream("data/" + n);
+        ser.write(out, get(n));
+    }
+
+    void load(const SearchName& n)
+    {
+        Serializer ser;
+        auto in = std::ifstream("data/" + n);
+        ser.read(in, get(n));
     }
 };
