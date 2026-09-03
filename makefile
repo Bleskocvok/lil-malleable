@@ -2,17 +2,19 @@
 
 CXXFLAGS = -std=c++23 -Wall -Wextra -O3
 
+CXXFLAGS += -I.
+
+DEPS = src/index.hpp
+
 CXX ?= clang++
 
 all: main server
 
-main.cpp: index.hpp ;
+server: src/server.cpp $(DEPS)
+	$(CXX) $(CXXFLAGS) -o $@ $<
 
-server: server.cpp
-	$(CXX) $(CXXFLAGS) -o $@ $^
-
-main: main.cpp
-	$(CXX) $(CXXFLAGS) -o $@ $^
+main: src/main.cpp $(DEPS)
+	$(CXX) $(CXXFLAGS) -o $@ $<
 
 clean:
 	$(RM) main server
