@@ -8,7 +8,10 @@
 #include <functional>
 #include <istream>
 #include <map>
+#include <memory>
+#include <mutex>
 #include <ostream>
+#include <shared_mutex>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -48,7 +51,7 @@ inline std::ostream& log()
     return std::cerr;
 }
 
-struct Index
+class Index
 {
     using DocumentMap = std::unordered_map<Id, std::uint64_t>;
 
@@ -58,8 +61,53 @@ struct Index
 
     double avg_len = 0;
 
+    mutable std::shared_mutex mutex_;
+
+public:
+    // Index() = default;
+
+    // Index(const Index&) = delete;
+    // Index& operator=(const Index&) = delete;
+
+    // Index(Index&& other)
+    //     : keyword_counts(std::move(other.keyword_counts))
+    //     , documents(std::move(other.documents))
+    //     , avg_len(other.avg_len)
+    // { }
+
+    // Index& operator=(Index&& other)
+    // {
+    //     keyword_counts = std::move(other.keyword_counts);
+    //     documents = std::move(other.documents);
+    //     avg_len = other.avg_len;
+    //     return *this;
+    // }
+
+    auto size() const
+    {
+        std::shared_lock guard(mutex_);
+        return documents.size();
+    }
+
+    Words at(Id id) const
+    {
+        std::shared_lock guard(mutex_);
+        return documents.at(id);
+    }
+
+    template<class F>
+    void for_each_document(F&& f) const
+    {
+        std::shared_lock guard(mutex_);
+
+        for (const auto& d : documents)
+            f(d);
+    }
+
     void add_document(Id id, Words words)
     {
+        std::unique_lock guard(mutex_);
+
         if (documents.contains(id))
             return;
 
@@ -92,6 +140,8 @@ struct Index
 
     Results search(const Words& words) const
     {
+        std::shared_lock guard(mutex_);
+
         Results results;
 
         if (documents.empty())
@@ -210,9 +260,11 @@ struct Tokenizer
     }
 };
 
-struct Search
+class SearchIndex
 {
     Tokenizer tokenizer;
+
+public:
     Index index_;
 
     void index(Id id, std::string txt)
@@ -232,18 +284,19 @@ struct Search
         return res;
     }
 
-    const Words& get(Id id) const
+    Words get(Id id) const
     {
-        return index_.documents.at(id);
+        return index_.at(id);
     }
 };
 
 struct Serializer
 {
-    void write(std::ostream& out, const Search& s)
+    void write(std::ostream& out, const SearchIndex& s)
     {
-        for (const auto& [id, words] : s.index_.documents)
-        {
+        s.index_.for_each_document([&out](const auto& elem){
+            const auto& [id, words] = elem;
+
             out << id << ",";
 
             bool fst = true;
@@ -253,10 +306,10 @@ struct Serializer
                 fst = false;
             }
             out << "\n";
-        }
+        });
     }
 
-    void read(std::istream& in, Search& s)
+    void read(std::istream& in, SearchIndex& s)
     {
         std::string line;
 
@@ -288,11 +341,11 @@ using SearchName = std::string;
 
 struct SearchManager
 {
-    std::map<SearchName, Search> searches;
+    std::map<SearchName, std::unique_ptr<SearchIndex>> searches;
 
     void create(SearchName n)
     {
-        searches.emplace(std::move(n), Search{});
+        searches.emplace(std::move(n), std::make_unique<SearchIndex>());
     }
 
     bool remove(const SearchName& n)
@@ -302,8 +355,8 @@ struct SearchManager
 
     bool exists(const SearchName& n) const { return searches.contains(n); }
 
-    const auto& get(const SearchName& n) const { return searches.at(n); }
-          auto& get(const SearchName& n)       { return searches.at(n); }
+    const auto& get(const SearchName& n) const { return *searches.at(n); }
+          auto& get(const SearchName& n)       { return *searches.at(n); }
 
     std::vector<SearchName> list() const
     {

@@ -48,7 +48,7 @@ inline int getenv_default_int(const std::string& e, int def)
     // return maybe_getenv(e).transform(&std::stoi).value_or(def);
 }
 
-void index(Search& s, json& j)
+void index(SearchIndex& s, json& j)
 {
     auto num = j["id"].template get<int>();
     std::string id = j["_t"].get<std::string>() + "_" + std::to_string(num);
@@ -137,7 +137,7 @@ int main(int /*argc*/, char** /*argv*/)
         auto index = req.get_param_value("index");
 
         json resp = json::object();
-        resp["count"] = search.get(index).index_.documents.size();
+        resp["count"] = search.get(index).index_.size();
         res.set_content(resp.dump(), "application/json");
     });
 

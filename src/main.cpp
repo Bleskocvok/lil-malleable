@@ -5,7 +5,7 @@
 
 int main()
 {
-    Search search;
+    SearchIndex search;
 
     search.index("0", "ahoj ahoj");
     search.index("1", "ahoj svete");
