@@ -1,0 +1,8 @@
+#!/bin/bash
+
+set -euo pipefail
+
+base="$(dirname $0)"
+
+wget 'https://github.com/nlohmann/json/releases/download/v3.12.0/json.hpp' -O "${base}/json.hpp"
+wget 'https://raw.githubusercontent.com/yhirose/cpp-httplib/refs/tags/v0.54.1/httplib.h' -O "${base}/httplib.h"
