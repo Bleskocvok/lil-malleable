@@ -1,3 +1,5 @@
+.PHONY: all clean
+
 CXXFLAGS = -std=c++23 -Wall -Wextra -O3
 
 CXX ?= clang++
@@ -11,3 +13,6 @@ server: server.cpp
 
 main: main.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $^
+
+clean:
+	$(RM) main server
